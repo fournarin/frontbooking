@@ -10,40 +10,70 @@ import dayjs, { type Dayjs } from 'dayjs';
 
 type ModalType = 'update' | 'delete' | null;
 
+// ─── Status config ────────────────────────────────────────────────────────────
+const STATUS: Record<string, { bg: string; text: string; dot: string; label: string }> = {
+  confirmed: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500', label: 'Confirmed' },
+  pending:   { bg: 'bg-amber-50',   text: 'text-amber-700',   dot: 'bg-amber-400',   label: 'Pending'   },
+  cancelled: { bg: 'bg-rose-50',    text: 'text-rose-700',    dot: 'bg-rose-500',    label: 'Cancelled' },
+};
+const FALLBACK = { bg: 'bg-slate-100', text: 'text-slate-500', dot: 'bg-slate-400', label: 'Unknown' };
+
+// ─── Icons ────────────────────────────────────────────────────────────────────
+const IcoEdit = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5
+         m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+  </svg>
+);
+const IcoTrash = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7
+         m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+  </svg>
+);
+const IcoClose = () => (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+  </svg>
+);
+const IcoWarn = () => (
+  <svg className="shrink-0 w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3
+         L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+  </svg>
+);
+const IcoChev = ({ open }: { open: boolean }) => (
+  <svg className={`w-4 h-4 text-slate-400 transition-transform duration-300 ${open ? 'rotate-180' : ''}`}
+    fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+  </svg>
+);
+const IcoCalEmpty = () => (
+  <svg className="w-16 h-16 text-white/10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1}
+      d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+  </svg>
+);
+
+// ─── Main component ───────────────────────────────────────────────────────────
 export default function MyBookingPage() {
-  // Guard to avoid hydration mismatch from MUI DatePicker
-  const [isMounted, setIsMounted] = useState(false);
-
-  // Accordion
-  const [expandedBookingId, setExpandedBookingId] = useState<string | null>(null);
-
-  // Modals
-  const [activeModal, setActiveModal] = useState<ModalType>(null);
+  const [isMounted,       setIsMounted]       = useState(false);
+  const [expandedId,      setExpandedId]      = useState<string | null>(null);
+  const [activeModal,     setActiveModal]     = useState<ModalType>(null);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const [updateDate,      setUpdateDate]      = useState<Dayjs | null>(null);
+  const [startTime,       setStartTime]       = useState('10:00');
+  const [endTime,         setEndTime]         = useState('12:00');
 
-  // Update form
-  const [updateDate, setUpdateDate] = useState<Dayjs | null>(null);
-  const [startTime, setStartTime] = useState('10:00');
-  const [endTime, setEndTime] = useState('12:00');
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  const statusColors: Record<string, string> = {
-    confirmed: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
-    pending: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
-    cancelled: 'bg-rose-50 text-rose-700 ring-1 ring-rose-200',
-  };
+  useEffect(() => { setIsMounted(true); }, []);
 
   const timeSlots = useMemo(
-    () => Array.from({ length: 13 }, (_, i) => `${i + 9}:00`.padStart(5, '0')),
+    () => Array.from({ length: 13 }, (_, i) => `${String(i + 9).padStart(2, '0')}:00`),
     []
   );
-
-  const toggleExpand = (id: string) => {
-    setExpandedBookingId((cur) => (cur === id ? null : id));
-  };
 
   const openModal = (type: Exclude<ModalType, null>, booking: Booking) => {
     setSelectedBooking(booking);
@@ -52,265 +82,573 @@ export default function MyBookingPage() {
     setEndTime(booking.endTime);
     setActiveModal(type);
   };
-
-  const closeModal = () => {
-    setActiveModal(null);
-    setSelectedBooking(null);
-  };
-
+  const closeModal = () => { setActiveModal(null); setSelectedBooking(null); };
   const handleUpdate = () => {
-    alert(
-      `Mockup: Updated booking for ${selectedBooking?.spaceName} to ${updateDate?.format('YYYY-MM-DD')} (${startTime} - ${endTime})`
-    );
+    alert(`Updated "${selectedBooking?.spaceName}" → ${updateDate?.format('YYYY-MM-DD')} · ${startTime}–${endTime}`);
     closeModal();
   };
-
   const handleDelete = () => {
-    alert(`Mockup: Deleted booking for ${selectedBooking?.spaceName}`);
+    alert(`Cancelled booking for "${selectedBooking?.spaceName}"`);
     closeModal();
   };
 
   if (!isMounted) return null;
 
   return (
-    <main className="min-h-screen bg-slate-50 pt-24 pb-16 px-0">
-      <div className="mx-auto w-full max-w-none">
-        {/* Header */}
-        <div className="mb-10 text-center px-4 sm:px-6">
-          <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight">My Booking</h1>
-          <p className="mt-2 text-slate-600">สรุปข้อมูลการจองของคุณ พร้อมแก้ไข (Update) และยกเลิก (Delete)</p>
+    <>
+      {/* ── Global styles injected via style tag ─────────────────────────── */}
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600;700&display=swap');
+
+        .cuspace-page { font-family: 'DM Sans', sans-serif; }
+        .cuspace-heading { font-family: 'DM Serif Display', serif; }
+
+        .booking-row {
+          background: #ffffff;
+          border-bottom: 1px solid #f1f5f9;
+          transition: background 0.15s ease;
+        }
+        .booking-row:hover { background: #f8fafc; }
+        .booking-row.is-open { background: #eef2ff; border-bottom-color: #c7d2fe; }
+
+        .detail-card {
+          background: #ffffff;
+          border: 1px solid #e2e8f0;
+          border-radius: 16px;
+        }
+        .detail-field {
+          border-bottom: 1px solid #f1f5f9;
+          border-right: 1px solid #f1f5f9;
+          padding: 16px 22px;
+          overflow: hidden;
+        }
+        .detail-field:nth-child(even) { border-right: none; }
+        .detail-field:nth-last-child(-n+2) { border-bottom: none; }
+        .detail-field dt {
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+          color: #94a3b8;
+          margin-bottom: 5px;
+          display: block;
+        }
+        .detail-field dd {
+          font-size: 14px;
+          font-weight: 600;
+          color: #1e293b;
+          line-height: 1.4;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          display: block;
+        }
+        .detail-field dd.is-mono {
+          font-size: 11px;
+          font-family: monospace;
+          color: #94a3b8;
+          font-weight: 400;
+        }
+        .detail-field dd.is-accent { color: #4f46e5; font-weight: 700; }
+
+        /* ── Modal card: clean white ── */
+        .modal-card {
+          background: #ffffff;
+          border: 1px solid #e2e8f0;
+          border-radius: 24px;
+          overflow: hidden;
+          box-shadow:
+            0 4px 6px rgba(0,0,0,0.04),
+            0 20px 60px rgba(0,0,0,0.12),
+            0 0 0 1px rgba(255,255,255,0.9) inset;
+        }
+
+        /* ── Buttons ── */
+        .btn-primary-blue {
+          background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+          box-shadow: 0 4px 14px rgba(99,102,241,0.35);
+          transition: all 0.2s ease;
+          color: white;
+        }
+        .btn-primary-blue:hover {
+          box-shadow: 0 6px 20px rgba(99,102,241,0.5);
+          transform: translateY(-1px);
+        }
+        .btn-primary-red {
+          background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%);
+          box-shadow: 0 4px 14px rgba(244,63,94,0.35);
+          transition: all 0.2s ease;
+          color: white;
+        }
+        .btn-primary-red:hover {
+          box-shadow: 0 6px 20px rgba(244,63,94,0.5);
+          transform: translateY(-1px);
+        }
+        .btn-ghost-light {
+          background: #f8fafc;
+          border: 1px solid #e2e8f0;
+          color: #64748b;
+          transition: all 0.2s ease;
+        }
+        .btn-ghost-light:hover { background: #f1f5f9; color: #334155; }
+
+        /* legacy ghost keep for rows */
+        .btn-ghost {
+          background: rgba(255,255,255,0.06);
+          border: 1px solid rgba(255,255,255,0.1);
+          transition: all 0.2s ease;
+        }
+        .btn-ghost:hover { background: rgba(255,255,255,0.1); }
+
+        .table-col-header {
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+        }
+
+        /* ── MUI light theme inside modal ── */
+        .light-mui .MuiOutlinedInput-root {
+          border-radius: 12px !important;
+          background: #f8fafc;
+        }
+        .light-mui .MuiOutlinedInput-notchedOutline {
+          border-color: #cbd5e1 !important;
+        }
+        .light-mui .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
+          border-color: #94a3b8 !important;
+        }
+        .light-mui .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
+          border-color: #6366f1 !important;
+        }
+        .light-mui .MuiInputLabel-root { color: #94a3b8 !important; }
+        .light-mui .MuiInputLabel-root.Mui-focused { color: #6366f1 !important; }
+        .light-mui .MuiSelect-select { color: #1e293b !important; font-weight: 500 !important; }
+
+        /* ── Modal header stripe ── */
+        .modal-stripe-blue {
+          background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
+          border-bottom: 1px solid #c7d2fe;
+        }
+        .modal-stripe-red {
+          background: linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%);
+          border-bottom: 1px solid #fecdd3;
+        }
+
+        /* ── Summary info box ── */
+        .info-box-blue {
+          background: #f0f4ff;
+          border: 1px solid #c7d2fe;
+          border-radius: 14px;
+          padding: 14px 18px;
+        }
+        .info-box-red {
+          background: #fff1f2;
+          border: 1px solid #fecdd3;
+          border-radius: 14px;
+        }
+        .info-box-warn {
+          background: #fffbeb;
+          border: 1px solid #fde68a;
+          border-radius: 12px;
+          padding: 14px 18px;
+        }
+      `}</style>
+
+      <main className="cuspace-page min-h-screen" style={{ background: '#f8fafc' }}>
+
+        {/* ══════════════════════════════════════════
+            PAGE HEADER
+        ══════════════════════════════════════════ */}
+        <div className="pt-28 pb-12 px-6 sm:px-10 lg:px-20 max-w-screen-2xl mx-auto">
+          <p className="table-col-header mb-3" style={{ color: '#6366f1', letterSpacing: '0.2em' }}>
+            CuSpace · My Account
+          </p>
+          <h1 className="cuspace-heading text-5xl sm:text-6xl font-normal text-slate-900 leading-tight">
+            My Bookings
+          </h1>
+          <p className="mt-3 text-sm font-light text-slate-500">
+            รายการจองทั้งหมดของคุณ · คลิกที่รายการเพื่อดูรายละเอียด แก้ไข หรือยกเลิก
+          </p>
         </div>
 
-        {/* Main card (full-width rectangle) */}
-        <section className="w-full bg-white rounded-none shadow-sm border-y border-slate-200 overflow-hidden">
-          <div className="px-6 sm:px-10 py-8 border-b border-slate-100 bg-gradient-to-b from-white to-slate-50">
-            <h2 className="text-xl font-bold text-slate-900">Reservations</h2>
-            <p className="text-sm text-slate-600 mt-1">คลิกที่รายการเพื่อดูรายละเอียด</p>
+        {/* ══════════════════════════════════════════
+            FULL-WIDTH TABLE
+        ══════════════════════════════════════════ */}
+        <section className="w-full" style={{ borderTop: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0', background: '#ffffff' }}>
+
+          {/* Table top bar */}
+          <div className="flex items-center justify-between px-6 sm:px-10 lg:px-20 py-4 max-w-screen-2xl mx-auto"
+            style={{ borderBottom: '1px solid #f1f5f9' }}>
+            <div className="flex items-center gap-2.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0" />
+              <span className="table-col-header text-slate-500">
+                Reservations
+              </span>
+            </div>
+            <span className="text-xs font-medium tabular-nums text-slate-400">
+              {mockMyBookings.length} {mockMyBookings.length === 1 ? 'booking' : 'bookings'}
+            </span>
           </div>
 
-          <div className="p-4 sm:p-8">
-            {mockMyBookings.length === 0 ? (
-              <div className="text-center text-slate-600 p-10 rounded-2xl border border-dashed border-slate-300 bg-slate-50 max-w-3xl mx-auto">
-                <p className="text-lg font-semibold">You have no bookings yet.</p>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-4 max-w-5xl mx-auto">
-                {mockMyBookings.map((booking) => {
-                  const isExpanded = expandedBookingId === booking.id;
-                  const statusClass =
-                    statusColors[booking.status] ?? 'bg-slate-100 text-slate-700 ring-1 ring-slate-200';
+          {/* Column labels — desktop */}
+          <div className="hidden lg:grid max-w-screen-2xl mx-auto
+                          grid-cols-[2rem_1fr_11rem_10rem_8rem_3rem]
+                          px-20 py-2.5 gap-x-6"
+            style={{ borderBottom: '1px solid #f8fafc', background: '#fafafa' }}>
+            <span />
+            <span className="table-col-header text-slate-400">Space / Booking ID</span>
+            <span className="table-col-header text-slate-400 text-right">Date</span>
+            <span className="table-col-header text-slate-400 text-center">Time</span>
+            <span className="table-col-header text-slate-400 text-center">Status</span>
+            <span />
+          </div>
 
-                  return (
-                    <article key={booking.id} className="rounded-2xl border border-slate-200 overflow-hidden bg-white">
-                      {/* Row summary (full width, rectangular both sides) */}
-                      <button
-                        type="button"
-                        onClick={() => toggleExpand(booking.id)}
-                        className="w-full text-left px-5 sm:px-6 py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4 hover:bg-slate-50 transition-colors"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start gap-3 flex-wrap">
-                            <h3 className="text-xl font-extrabold text-slate-900 truncate">{booking.spaceName}</h3>
-                            <span
-                              className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${statusClass}`}
-                            >
-                              {booking.status}
+          {/* Empty state */}
+          {mockMyBookings.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-32 gap-4">
+              <svg className="w-16 h-16 text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1}
+                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <p className="text-sm font-medium text-slate-400">No bookings yet</p>
+            </div>
+          ) : (
+            <div>
+              {mockMyBookings.map((booking, idx) => {
+                const isOpen = expandedId === booking.id;
+                const cfg    = STATUS[booking.status] ?? FALLBACK;
+
+                return (
+                  <article key={booking.id}
+                    className="max-w-screen-2xl mx-auto">
+
+                    {/* ── Summary row ── */}
+                    <button
+                      type="button"
+                      onClick={() => setExpandedId(p => p === booking.id ? null : booking.id)}
+                      className={`booking-row w-full text-left ${isOpen ? 'is-open' : ''}`}
+                    >
+                      <div className="px-6 sm:px-10 lg:px-20 py-5
+                                      grid grid-cols-[1.5rem_1fr_auto] lg:grid-cols-[2rem_1fr_11rem_10rem_8rem_3rem]
+                                      items-center gap-x-6">
+
+                        {/* Index number */}
+                        <span className="text-xs font-mono tabular-nums text-center text-slate-300">
+                          {String(idx + 1).padStart(2, '0')}
+                        </span>
+
+                        {/* Name + ID */}
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2.5">
+                            <h3 className="text-base font-semibold text-slate-900 truncate">
+                              {booking.spaceName}
+                            </h3>
+                            <span className={`lg:hidden shrink-0 px-2.5 py-0.5 rounded-full text-[10px] font-bold
+                              uppercase tracking-wider ${cfg.bg} ${cfg.text}`}>
+                              {cfg.label}
                             </span>
                           </div>
-                          <p className="mt-2 text-sm text-slate-600">
-                            <span className="font-semibold text-slate-800">Booking ID:</span> {booking.id}
+                          <p className="text-[11px] font-mono mt-0.5 truncate text-slate-400">
+                            {booking.id}
                           </p>
                         </div>
 
-                        <div className="shrink-0 w-full md:w-auto md:text-right">
-                          <p className="text-base font-bold text-slate-800">📅 {booking.bookingDate}</p>
-                          <p className="text-sm text-slate-600 mt-1">
-                            ⏰ {booking.startTime} - {booking.endTime}
-                          </p>
+                        {/* Date (desktop) */}
+                        <p className="hidden lg:block text-sm font-medium text-right shrink-0 tabular-nums text-slate-600">
+                          {booking.bookingDate}
+                        </p>
+
+                        {/* Time (desktop) */}
+                        <p className="hidden lg:block text-sm text-center shrink-0 tabular-nums text-slate-400">
+                          {booking.startTime}&thinsp;–&thinsp;{booking.endTime}
+                        </p>
+
+                        {/* Status badge (desktop) */}
+                        <div className="hidden lg:flex justify-center shrink-0">
+                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full
+                            text-[11px] font-semibold tracking-wide ${cfg.bg} ${cfg.text}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${cfg.dot}`} />
+                            {cfg.label}
+                          </span>
                         </div>
 
-                        <div className="hidden md:flex items-center justify-center w-10 text-slate-400">
-                          <svg
-                            className={`w-6 h-6 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                          </svg>
+                        {/* Chevron */}
+                        <div className="flex justify-center shrink-0">
+                          <IcoChev open={isOpen} />
                         </div>
-                      </button>
+                      </div>
+                    </button>
 
-                      {/* Expanded details */}
-                      {isExpanded && (
-                        <div className="px-5 sm:px-6 pb-6 pt-2 border-t border-slate-100 bg-slate-50">
-                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
-                            {/* Left: details card */}
-                            <div className="bg-white rounded-2xl border border-slate-200 p-5">
-                              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Booking details</p>
-                              <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                                <div>
-                                  <p className="text-slate-500">Name</p>
-                                  <p className="font-semibold text-slate-900">{(booking as any).userName ?? '-'}</p>
-                                </div>
-                                <div>
-                                  <p className="text-slate-500">Tel</p>
-                                  <p className="font-semibold text-slate-900">{(booking as any).userTel ?? '-'}</p>
-                                </div>
-                                <div>
-                                  <p className="text-slate-500">Time</p>
-                                  <p className="font-semibold text-slate-900">
-                                    {booking.startTime} - {booking.endTime}
-                                  </p>
-                                </div>
-                                <div>
-                                  <p className="text-slate-500">Total</p>
-                                  <p className="font-extrabold text-blue-700">{(booking as any).totalPrice ?? '-'} THB</p>
+                    {/* ── Expanded panel ── */}
+                    {isOpen && (
+                      <div className="px-6 sm:px-10 lg:px-20 pt-5 pb-8"
+                        style={{ background: '#f0f4ff', borderBottom: '1px solid #c7d2fe' }}>
+
+                        {/* Mobile date/time strip */}
+                        <div className="flex lg:hidden items-center gap-3 mb-5 text-xs text-slate-500">
+                          <span className="font-semibold text-slate-700">{booking.bookingDate}</span>
+                          <span className="text-slate-300">·</span>
+                          <span className="tabular-nums">{booking.startTime}–{booking.endTime}</span>
+                        </div>
+
+                        {/* Centered grid */}
+                        <div className="flex justify-center">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full max-w-4xl">
+
+                            {/* Details card */}
+                            <div className="detail-card md:col-span-2 overflow-hidden">
+                              <div className="px-5 py-3.5 flex items-center gap-2"
+                                style={{ borderBottom: '1px solid #f1f5f9', background: '#f8fafc' }}>
+                                <span className="w-1 h-1 rounded-full bg-indigo-400 shrink-0" />
+                                <p className="table-col-header text-slate-500">
+                                  Booking Details
+                                </p>
+                              </div>
+                              <div className="grid grid-cols-2">
+                                {([
+                                  { label: 'Name',       value: (booking as any).userName  ?? '—'                          },
+                                  { label: 'Telephone',  value: (booking as any).userTel   ?? '—'                          },
+                                  { label: 'Date',       value: booking.bookingDate                                         },
+                                  { label: 'Time',       value: `${booking.startTime} – ${booking.endTime}`                },
+                                  { label: 'Total',      value: `${(booking as any).totalPrice ?? '—'} THB`, accent: true  },
+                                  { label: 'Booking ID', value: booking.id,                                  mono: true    },
+                                ] as { label: string; value: string; accent?: boolean; mono?: boolean }[])
+                                  .map(({ label, value, accent, mono }) => (
+                                    <div key={label} className="detail-field">
+                                      <dt>{label}</dt>
+                                      <dd className={`${mono ? 'is-mono' : ''} ${accent ? 'is-accent' : ''}`}>
+                                        {value}
+                                      </dd>
+                                    </div>
+                                  ))
+                                }
+                              </div>
+                            </div>
+
+                            {/* Actions card */}
+                            <div className="detail-card flex flex-col">
+                              <div className="px-5 py-3.5 flex items-center gap-2"
+                                style={{ borderBottom: '1px solid #f1f5f9', background: '#f8fafc' }}>
+                                <span className="w-1 h-1 rounded-full bg-indigo-400 shrink-0" />
+                                <p className="table-col-header text-slate-500">
+                                  Actions
+                                </p>
+                              </div>
+                              <div className="flex-1 p-5 flex flex-col justify-between gap-5">
+                                <p className="text-xs leading-relaxed text-slate-500">
+                                  ต้องการแก้ไขวันที่หรือเวลา<br />หรือยกเลิกการจองนี้?
+                                </p>
+                                <div className="flex flex-col gap-3">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); openModal('update', booking); }}
+                                    className="btn-ghost-light w-full inline-flex items-center justify-center gap-2
+                                               px-4 py-3 rounded-xl text-sm font-medium"
+                                  >
+                                    <IcoEdit /> Edit Booking
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); openModal('delete', booking); }}
+                                    className="btn-primary-red w-full inline-flex items-center justify-center gap-2
+                                               px-4 py-3 rounded-xl text-sm font-semibold text-white"
+                                  >
+                                    <IcoTrash /> Cancel Booking
+                                  </button>
                                 </div>
                               </div>
                             </div>
 
-                            {/* Right: actions */}
-                            <div className="bg-white rounded-2xl border border-slate-200 p-5 flex flex-col">
-                              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Actions</p>
-                              <p className="text-sm text-slate-600 mt-2">ต้องการแก้ไขเวลา/วันที่ หรือยกเลิกรายการจอง?</p>
-
-                              <div className="mt-auto pt-6 flex flex-col sm:flex-row gap-3 justify-end">
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    openModal('update', booking);
-                                  }}
-                                  className="w-full sm:w-auto px-6 py-3 rounded-xl font-bold bg-white border border-slate-300 text-slate-800 hover:bg-slate-50 transition-colors shadow-sm"
-                                >
-                                  Update
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    openModal('delete', booking);
-                                  }}
-                                  className="w-full sm:w-auto px-6 py-3 rounded-xl font-bold bg-rose-600 text-white hover:bg-rose-700 transition-colors shadow-sm"
-                                >
-                                  Delete
-                                </button>
-                              </div>
-                            </div>
                           </div>
                         </div>
-                      )}
-                    </article>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+                      </div>
+                    )}
+                  </article>
+                );
+              })}
+            </div>
+          )}
         </section>
-      </div>
 
-      {/* Update modal */}
-      <Modal isOpen={activeModal === 'update'} onClose={closeModal} title="Update Booking">
-        <div className="bg-white rounded-3xl p-6 sm:p-10 shadow-2xl border border-slate-100 flex flex-col gap-6">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h2 className="text-2xl font-extrabold text-slate-900">Update Booking</h2>
-              <p className="text-sm text-slate-600 mt-1">ปรับวันที่และเวลาให้กับรายการจองนี้</p>
+        {/* ══════════════════════════════════════════
+            UPDATE MODAL
+        ══════════════════════════════════════════ */}
+        <Modal isOpen={activeModal === 'update'} onClose={closeModal}>
+          <div className="modal-card w-full max-w-lg light-mui">
+
+            {/* Header stripe */}
+            <div className="modal-stripe-blue px-8 pt-8 pb-7 relative overflow-hidden">
+              {/* Decorative blob */}
+              <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full pointer-events-none"
+                style={{ background: 'radial-gradient(circle, rgba(99,102,241,0.15), transparent 70%)' }} />
+              <div className="absolute -bottom-8 -left-8 w-32 h-32 rounded-full pointer-events-none"
+                style={{ background: 'radial-gradient(circle, rgba(99,102,241,0.08), transparent 70%)' }} />
+
+              <div className="flex items-start justify-between gap-4 relative z-10">
+                <div className="min-w-0">
+                  {/* Icon pill */}
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full mb-3"
+                    style={{ background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.2)' }}>
+                    <IcoEdit />
+                    <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-indigo-600">Edit Reservation</span>
+                  </div>
+                  <h2 className="cuspace-heading text-2xl text-slate-900 truncate leading-tight">
+                    {selectedBooking?.spaceName}
+                  </h2>
+                  <p className="text-sm mt-1.5 text-slate-500 tabular-nums">
+                    {selectedBooking?.bookingDate}&ensp;·&ensp;
+                    {selectedBooking?.startTime}–{selectedBooking?.endTime}
+                  </p>
+                </div>
+                <button onClick={closeModal}
+                  className="btn-ghost-light shrink-0 w-10 h-10 flex items-center justify-center rounded-xl text-slate-400 hover:text-slate-700"
+                  aria-label="Close">
+                  <IcoClose />
+                </button>
+              </div>
             </div>
-            <button
-              onClick={closeModal}
-              className="shrink-0 rounded-xl px-3 py-2 text-slate-500 hover:bg-slate-100"
-              aria-label="Close"
-            >
-              ✕
-            </button>
-          </div>
 
-          <div className="bg-slate-50 p-4 rounded-xl border">
-            <p className="text-sm text-slate-600">Editing reservation for:</p>
-            <p className="font-extrabold text-slate-900 text-lg">{selectedBooking?.spaceName}</p>
-          </div>
+            {/* Body */}
+            <div className="px-8 py-7 flex flex-col gap-6 bg-white">
+              <p className="text-sm text-slate-500">เลือกวันที่และช่วงเวลาใหม่สำหรับการจองนี้</p>
 
-          <LocalizationProvider dateAdapter={AdapterDayjs}>
-            <DatePicker
-              label="Select New Date"
-              value={updateDate}
-              onChange={(value) => setUpdateDate(value)}
-              className="w-full"
-              slotProps={{ textField: { variant: 'standard' } }}
-            />
-          </LocalizationProvider>
+              <LocalizationProvider dateAdapter={AdapterDayjs}>
+                <DatePicker
+                  label="New Date"
+                  value={updateDate}
+                  onChange={(v) => setUpdateDate(v)}
+                  slotProps={{ textField: { variant: 'outlined', size: 'medium', fullWidth: true } }}
+                />
+              </LocalizationProvider>
 
-          <div className="grid grid-cols-2 gap-4">
-            <FormControl variant="standard" fullWidth>
-              <InputLabel>New Start Time</InputLabel>
-              <Select value={startTime} onChange={(e) => setStartTime(e.target.value)}>
-                {timeSlots.map((time) => (
-                  <MenuItem key={time} value={time}>
-                    {time}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <FormControl variant="standard" fullWidth>
-              <InputLabel>New End Time</InputLabel>
-              <Select value={endTime} onChange={(e) => setEndTime(e.target.value)}>
-                {timeSlots.map((time) => (
-                  <MenuItem key={time} value={time}>
-                    {time}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </div>
+              <div className="grid grid-cols-2 gap-4">
+                <FormControl size="medium" fullWidth>
+                  <InputLabel>Start Time</InputLabel>
+                  <Select label="Start Time" value={startTime} onChange={(e) => setStartTime(e.target.value)}>
+                    {timeSlots.map((t) => <MenuItem key={t} value={t}>{t}</MenuItem>)}
+                  </Select>
+                </FormControl>
+                <FormControl size="medium" fullWidth>
+                  <InputLabel>End Time</InputLabel>
+                  <Select label="End Time" value={endTime} onChange={(e) => setEndTime(e.target.value)}>
+                    {timeSlots.map((t) => <MenuItem key={t} value={t}>{t}</MenuItem>)}
+                  </Select>
+                </FormControl>
+              </div>
 
-          <div className="flex justify-end gap-3 mt-2 pt-6 border-t">
-            <button onClick={closeModal} className="px-6 py-2.5 rounded-xl font-bold text-slate-600 hover:bg-slate-100">
-              Cancel
-            </button>
-            <button onClick={handleUpdate} className="px-6 py-2.5 rounded-xl font-bold bg-blue-600 text-white hover:bg-blue-700 shadow">
-              Confirm Update
-            </button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Delete modal */}
-      <Modal isOpen={activeModal === 'delete'} onClose={closeModal} title="Cancel Reservation?">
-        <div className="bg-white rounded-3xl p-6 sm:p-10 shadow-2xl border border-slate-100 flex flex-col gap-6">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h2 className="text-2xl font-extrabold text-slate-900">Cancel Reservation?</h2>
-              <p className="text-sm text-slate-600 mt-1">ยืนยันการลบ/ยกเลิกรายการจอง</p>
+              {/* Preview chip */}
+              {updateDate && (
+                <div className="info-box-blue flex items-center gap-3">
+                  <span className="w-2 h-2 rounded-full bg-indigo-400 shrink-0" />
+                  <p className="text-sm text-indigo-700 font-medium tabular-nums">
+                    {updateDate.format('DD MMM YYYY')}&ensp;·&ensp;{startTime}–{endTime}
+                  </p>
+                </div>
+              )}
             </div>
-            <button
-              onClick={closeModal}
-              className="shrink-0 rounded-xl px-3 py-2 text-slate-500 hover:bg-slate-100"
-              aria-label="Close"
-            >
-              ✕
-            </button>
-          </div>
 
-          <p className="text-slate-700">Are you sure you want to cancel your reservation for:</p>
-          <div className="bg-rose-50 p-4 rounded-2xl border border-rose-100">
-            <p className="font-extrabold text-slate-900 text-lg">{selectedBooking?.spaceName}</p>
-            <p className="text-slate-700 text-sm mt-1">📅 {selectedBooking?.bookingDate}</p>
-            <p className="text-slate-700 text-sm">⏰ {selectedBooking?.startTime} - {selectedBooking?.endTime}</p>
+            {/* Footer */}
+            <div className="px-8 py-5 flex justify-end gap-3 bg-slate-50"
+              style={{ borderTop: '1px solid #f1f5f9' }}>
+              <button onClick={closeModal}
+                className="btn-ghost-light px-6 py-3 rounded-xl text-base font-medium">
+                Cancel
+              </button>
+              <button onClick={handleUpdate}
+                className="btn-primary-blue px-7 py-3 rounded-xl text-base font-semibold">
+                  Confirm Update  
+              </button>
+            </div>
           </div>
-          <p className="text-rose-600 text-sm font-medium">Warning: This action cannot be undone.</p>
+        </Modal>
 
-          <div className="flex justify-end gap-3 mt-2 pt-6 border-t">
-            <button onClick={closeModal} className="px-6 py-2.5 rounded-xl font-bold text-slate-600 hover:bg-slate-100">
-              Go Back
-            </button>
-            <button onClick={handleDelete} className="px-6 py-2.5 rounded-xl font-bold bg-rose-600 text-white hover:bg-rose-700 shadow">
-              Yes, Cancel Booking
-            </button>
+        {/* ══════════════════════════════════════════
+            DELETE MODAL
+        ══════════════════════════════════════════ */}
+        <Modal isOpen={activeModal === 'delete'} onClose={closeModal}>
+          <div className="modal-card w-full max-w-lg">
+
+            {/* Header stripe */}
+            <div className="modal-stripe-red px-8 pt-8 pb-7 relative overflow-hidden">
+              <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full pointer-events-none"
+                style={{ background: 'radial-gradient(circle, rgba(244,63,94,0.12), transparent 70%)' }} />
+              <div className="absolute -bottom-8 -left-8 w-32 h-32 rounded-full pointer-events-none"
+                style={{ background: 'radial-gradient(circle, rgba(244,63,94,0.06), transparent 70%)' }} />
+
+              <div className="flex items-start justify-between gap-4 relative z-10">
+                <div className="min-w-0">
+                  {/* Icon pill */}
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full mb-3"
+                    style={{ background: 'rgba(244,63,94,0.1)', border: '1px solid rgba(244,63,94,0.2)' }}>
+                    <IcoTrash />
+                    <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-rose-600">Cancel Reservation</span>
+                  </div>
+                  <h2 className="cuspace-heading text-2xl text-slate-900 truncate leading-tight">
+                    {selectedBooking?.spaceName}
+                  </h2>
+                  <p className="text-sm mt-1.5 text-slate-500 tabular-nums">
+                    {selectedBooking?.bookingDate}&ensp;·&ensp;
+                    {selectedBooking?.startTime}–{selectedBooking?.endTime}
+                  </p>
+                </div>
+                <button onClick={closeModal}
+                  className="btn-ghost-light shrink-0 w-10 h-10 flex items-center justify-center rounded-xl text-slate-400 hover:text-slate-700"
+                  aria-label="Close">
+                  <IcoClose />
+                </button>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="px-8 py-7 flex flex-col gap-5 bg-white">
+              <p className="text-sm text-slate-600">คุณต้องการยืนยันการยกเลิกการจองนี้ใช่ไหม?</p>
+
+              {/* Summary box */}
+              <div className="info-box-red overflow-hidden">
+                <div className="grid grid-cols-2" style={{ borderBottom: '1px solid #fecdd3' }}>
+                  <div className="px-6 py-5 min-w-0" style={{ borderRight: '1px solid #fecdd3' }}>
+                    <p className="table-col-header mb-2 text-rose-400">Space</p>
+                    <p className="text-sm font-semibold text-slate-800 truncate">{selectedBooking?.spaceName}</p>
+                  </div>
+                  <div className="px-6 py-5 min-w-0">
+                    <p className="table-col-header mb-2 text-rose-400">Date</p>
+                    <p className="text-sm font-semibold text-slate-800 truncate">{selectedBooking?.bookingDate}</p>
+                  </div>
+                </div>
+                <div className="px-6 py-5">
+                  <p className="table-col-header mb-2 text-rose-400">Time Slot</p>
+                  <p className="text-sm font-semibold text-slate-800 tabular-nums">
+                    {selectedBooking?.startTime} – {selectedBooking?.endTime}
+                  </p>
+                </div>
+              </div>
+
+              {/* Warning banner */}
+              <div className="info-box-warn flex items-start gap-3">
+                <IcoWarn />
+                <p className="text-sm text-amber-800 leading-relaxed">
+                  <span className="font-semibold">คำเตือน:</span> การยกเลิกนี้ไม่สามารถเรียกคืนได้ กรุณาตรวจสอบข้อมูลก่อนกดยืนยัน
+                </p>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-8 py-5 flex justify-end gap-3 bg-slate-50"
+              style={{ borderTop: '1px solid #f1f5f9' }}>
+              <button onClick={closeModal}
+                className="btn-ghost-light px-6 py-3 rounded-xl text-base font-medium">
+                Go Back
+              </button>
+              <button onClick={handleDelete}
+                className="btn-primary-red px-7 py-3 rounded-xl text-base font-semibold">
+                Yes, Cancel Booking
+              </button>
+            </div>
           </div>
-        </div>
-      </Modal>
-    </main>
+        </Modal>
+
+      </main>
+    </>
   );
 }
